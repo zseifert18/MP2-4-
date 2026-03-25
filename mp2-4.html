@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Spotify Top 50 of 2020 Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #000000;
+      margin: 0;
+      padding: 20px;
+      color: #f5f5f5;
+    }
+
+    .dashboard-container {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 24px;
+      color: #1DB954;
+      font-size: 36px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-shadow: 0 0 8px rgba(29, 185, 84, 0.45);
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+      margin-bottom: 20px;
+    }
+
+    .chart-card {
+      background: #111111;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 4px 18px rgba(29, 185, 84, 0.08);
+      border: 1px solid #222;
+    }
+
+    .chart-title {
+      text-align: center;
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 20px;
+      color: #1DB954;
+    }
+
+    #genre-bar-chart,
+    #loudness-chart {
+      width: 100%;
+      height: 360px;
+    }
+
+    #tempo-duration {
+      width: 100%;
+      height: 430px;
+    }
+
+    #song-list-box {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      background: #181818;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    #song-list-box h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #1DB954;
+    }
+
+    #song-list {
+      margin: 0;
+      padding-left: 22px;
+      color: #f5f5f5;
+    }
+
+    #song-list li {
+      margin-bottom: 6px;
+      line-height: 1.35;
+      font-size: 14px;
+    }
+
+    .placeholder {
+      color: #b3b3b3;
+      font-style: italic;
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .table-wrap {
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+
+    .avg-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #181818;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .avg-table th,
+    .avg-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #2a2a2a;
+      font-size: 14px;
+    }
+
+    .avg-table th {
+      background: #1DB954;
+      color: #000000;
+      font-weight: bold;
+    }
+
+    .avg-table tr:hover {
+      background: #202020;
+    }
+
+    .genre-color-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 950px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #genre-bar-chart,
+      #loudness-chart,
+      #tempo-duration {
+        height: 340px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <h1>Spotify Top 50 Dashboard</h1>
+
+    <div class="dashboard-grid">
+      <div class="chart-card">
+        <h2 class="chart-title">Number of Songs per Genre</h2>
+        <div id="genre-bar-chart"></div>
+
+        <div id="song-list-box">
+          <h3 id="genre-title">Click a genre bar to see its songs</h3>
+          <div id="song-list-container">
+            <p class="placeholder">The songs for that genre will appear here.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h2 class="chart-title">Loudness (dB) by Track</h2>
+        <div id="loudness-chart"></div>
+
+        <div class="table-wrap">
+          <h3 class="chart-title" style="font-size:16px; margin-top:16px;">Average Loudness by Genre</h3>
+          <table class="avg-table">
+            <thead>
+              <tr>
+                <th>Genre</th>
+                <th>Average Loudness (dB)</th>
+              </tr>
+            </thead>
+            <tbody id="avg-loudness-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 class="chart-title">Tempo vs Duration</h2>
+      <div id="tempo-duration"></div>
+    </div>
+  </div>
+
+  <script>
+    const genreColors = {
+      "Pop": "rgb(255, 159, 64)",
+      "Hip-Hop/Rap": "rgb(75, 192, 192)",
+      "Dance/Electronic": "rgb(255, 206, 86)",
+      "Alternative/Indie": "rgb(54, 162, 235)",
+      "Electro-pop": "rgb(153, 102, 255)",
+      "R&B/Soul": "rgb(255, 99, 132)",
+      "Alternative/reggaeton/experimental": "rgb(255, 99, 255)",
+      "Chamber pop": "rgb(139, 69, 19)",
+      "Dance-pop/Disco": "rgb(255, 127, 80)",
+      "Disco-pop": "rgb(255, 20, 147)",
+      "Dreampop/Hip-Hop/R&B": "rgb(199, 21, 133)",
+      "Hip-Hop/Trap": "rgb(100, 149, 237)",
+      "Nu-disco": "rgb(0, 191, 255)",
+      "Pop rap": "rgb(255, 215, 0)",
+      "Pop/Soft Rock": "rgb(34, 139, 34)",
+      "R&B/Hip-Hop alternative": "rgb(255, 140, 0)"
+    };
+
+    const genreAliasMap = {
+      "Hip-Hop": "Hip-Hop/Rap",
+      "Dance": "Dance/Electronic",
+      "Alternative": "Alternative/Indie",
+      "Pop Rap": "Pop rap",
+      "Chamber Pop": "Chamber pop",
+      "Latin": "Alternative/reggaeton/experimental",
+      "R&B": "R&B/Soul"
+    };
+
+    function normalizeGenre(genre) {
+      return genreAliasMap[genre] || genre;
+    }
+
+    function normalizeSongTitle(title) {
+      return title
+        .toLowerCase()
+        .replace(/\s*\(alt\)/g, "")
+        .replace(/\s*-\s*imanbek remix/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    const darkLayout = {
+      paper_bgcolor: "#111111",
+      plot_bgcolor: "#111111",
+      font: { color: "#f5f5f5" },
+      xaxis: {
+        gridcolor: "#333333",
+        zerolinecolor: "#333333",
+        linecolor: "#666666",
+        tickfont: { color: "#f5f5f5" }
+      },
+      yaxis: {
+        gridcolor: "#333333",
+        zerolinecolor: "#333333",
+        linecolor: "#666666",
+        tickfont: { color: "#f5f5f5" }
+      },
+      legend: {
+        font: { color: "#f5f5f5" },
+        bgcolor: "rgba(0,0,0,0)"
+      }
+    };
+
+    const genreSongs = {
+      "Alternative/Indie": [
+        { song: "Dance Monkey", artist: "Tones And I" },
+        { song: "Someone You Loved", artist: "Lewis Capaldi" },
+        { song: "Before You Go", artist: "Lewis Capaldi" },
+        { song: "Supalonely", artist: "BENEE" }
+      ],
+      "Alternative/reggaeton/experimental": [
+        { song: "Safaera", artist: "Bad Bunny" }
+      ],
+      "Chamber pop": [
+        { song: "lovely", artist: "Billie Eilish & Khalid" }
+      ],
+      "Dance-pop/Disco": [
+        { song: "Break My Heart", artist: "Dua Lipa" }
+      ],
+      "Dance/Electronic": [
+        { song: "Roses", artist: "SAINt JHN" },
+        { song: "Breaking Me", artist: "Topic" },
+        { song: "Physical", artist: "Dua Lipa" },
+        { song: "ily", artist: "Surf Mesa" },
+        { song: "Be Kind", artist: "Marshmello" }
+      ],
+      "Disco-pop": [
+        { song: "Dynamite", artist: "BTS" }
+      ],
+      "Dreampop/Hip-Hop/R&B": [
+        { song: "Sunflower", artist: "Post Malone" }
+      ],
+      "Electro-pop": [
+        { song: "bad guy", artist: "Billie Eilish" },
+        { song: "Sunday Best", artist: "Surfaces" }
+      ],
+      "Hip-Hop/Rap": [
+        { song: "The Box", artist: "Roddy Ricch" },
+        { song: "ROCKSTAR", artist: "DaBaby" },
+        { song: "ROXANNE", artist: "Arizona Zervas" },
+        { song: "Mood", artist: "24kGoldn" },
+        { song: "SICKO MODE", artist: "Travis Scott" },
+        { song: "Godzilla", artist: "Eminem" },
+        { song: "HIGHEST IN THE ROOM", artist: "Travis Scott" },
+        { song: "Blueberry Faygo", artist: "Lil Mosey" },
+        { song: "Toosie Slide", artist: "Drake" },
+        { song: "Party Girl", artist: "StaySolidRocky" },
+        { song: "Life Is Good", artist: "Future" },
+        { song: "WAP", artist: "Cardi B" },
+        { song: "Lucid Dreams", artist: "Juice WRLD" }
+      ],
+      "Hip-Hop/Trap": [
+        { song: "WAP", artist: "Cardi B" }
+      ],
+      "Nu-disco": [
+        { song: "Don't Start Now", artist: "Dua Lipa" }
+      ],
+      "Pop": [
+        { song: "Watermelon Sugar", artist: "Harry Styles" },
+        { song: "Falling", artist: "Trevor Daniel" },
+        { song: "Tusa", artist: "KAROL G" },
+        { song: "Circles", artist: "Post Malone" },
+        { song: "Intentions", artist: "Justin Bieber" },
+        { song: "Yummy", artist: "Justin Bieber" },
+        { song: "Say So", artist: "Doja Cat" },
+        { song: "Memories", artist: "Maroon 5" },
+        { song: "Savage Love", artist: "Jawsh 685" },
+        { song: "Adore You", artist: "Harry Styles" },
+        { song: "everything i wanted", artist: "Billie Eilish" },
+        { song: "Señorita", artist: "Shawn Mendes" },
+        { song: "Stuck with U", artist: "Ariana Grande" },
+        { song: "If the World Was Ending", artist: "JP Saxe" }
+      ],
+      "Pop rap": [
+        { song: "Mood", artist: "24kGoldn" }
+      ],
+      "Pop/Soft Rock": [
+        { song: "Before You Go", artist: "Lewis Capaldi" }
+      ],
+      "R&B/Hip-Hop alternative": [
+        { song: "Falling", artist: "Trevor Daniel" }
+      ],
+      "R&B/Soul": [
+        { song: "Blinding Lights", artist: "The Weeknd" },
+        { song: "Go Crazy", artist: "Chris Brown" }
+      ]
+    };
+
+    const genreOrder = [
+      "Pop",
+      "Hip-Hop/Rap",
+      "Dance/Electronic",
+      "Alternative/Indie",
+      "Electro-pop",
+      "R&B/Soul",
+      "Alternative/reggaeton/experimental",
+      "Chamber pop",
+      "Dance-pop/Disco",
+      "Disco-pop",
+      "Dreampop/Hip-Hop/R&B",
+      "Hip-Hop/Trap",
+      "Nu-disco",
+      "Pop rap",
+      "Pop/Soft Rock",
+      "R&B/Hip-Hop alternative"
+    ];
+
+    const songs = [
+      "Blinding Lights","Dance Monkey","The Box","Roses","Don't Start Now",
+      "ROCKSTAR","Watermelon Sugar","death bed","Falling","Someone You Loved",
+      "Tusa","ROXANNE","Circles","Intentions","Yummy","Before You Go",
+      "Say So","Memories","Life Is Good","Savage Love",
+      "Adore You","Breaking Me","Mood","everything i wanted","Señorita",
+      "bad guy","lovely","Lucid Dreams","Stuck with U","If the World Was Ending",
+      "Physical","SICKO MODE","Godzilla","HIGHEST IN THE ROOM","Sunflower",
+      "Safaera","RITMO","Blueberry Faygo","WAP","ily",
+      "Break My Heart","Rain On Me","Toosie Slide","Intentions (alt)","Go Crazy",
+      "Be Kind","ROSES (alt)","Supalonely","Sunday Best","Party Girl"
+    ];
+
+    const artists = [
+      "The Weeknd","Tones and I","Roddy Ricch","SAINt JHN","Dua Lipa",
+      "DaBaby","Harry Styles","Powfu","Trevor Daniel","Lewis Capaldi",
+      "KAROL G","Arizona Zervas","Post Malone","Justin Bieber","Justin Bieber",
+      "Lewis Capaldi","Doja Cat","Maroon 5","Future","Jawsh 685",
+      "Harry Styles","Topic","24kGoldn","Billie Eilish","Shawn Mendes",
+      "Billie Eilish","Billie Eilish","Juice WRLD","Ariana Grande","JP Saxe",
+      "Dua Lipa","Travis Scott","Eminem","Travis Scott","Post Malone",
+      "Bad Bunny","Black Eyed Peas","Lil Mosey","Cardi B","Surf Mesa",
+      "Dua Lipa","Lady Gaga","Drake","Justin Bieber","Chris Brown",
+      "Marshmello","SAINt JHN","BENEE","Surfaces","StaySolidRocky"
+    ];
+
+    const rawGenres = [
+      "R&B/Soul","Alternative/Indie","Hip-Hop/Rap","Dance/Electronic","Pop",
+      "Hip-Hop/Rap","Pop","Alternative","Pop","Alternative",
+      "Latin","Hip-Hop","Pop","Pop","Pop",
+      "Alternative","Pop","Pop","Hip-Hop","Dance",
+      "Pop","Dance","Pop Rap","Alternative","Pop",
+      "Alternative","Chamber Pop","Hip-Hop","Pop","Pop",
+      "Pop","Hip-Hop","Hip-Hop","Hip-Hop","Hip-Hop",
+      "Latin","Pop","Hip-Hop","Hip-Hop","Dance",
+      "Pop","Pop","Hip-Hop","Pop","R&B",
+      "Pop","Dance","Alternative","Pop","Hip-Hop"
+    ];
+
+    const normalizedGenres = rawGenres.map(g => normalizeGenre(g));
+
+    const loudness = [
+      -6.5, -6.8, -5.4, -4.6, -8.0, -4.3, -8.7, -8.8, -5.7, -3.3,
+      -5.6, -3.5, -7.9, -6.6, -8.8, -4.9, -4.6, -7.2, -6.9, -8.5,
+      -3.7, -5.6, -3.5, -6.0, -14.5, -11.0, -7.5, -6.8, -5.2, -6.7,
+      -3.4, -4.5, -4.8, -7.6, -3.8, -8.7, -4.4, -3.5, -4.2, -3.3,
+      -7.1, -7.7, -4.1, -10.1, -7.2, -6.6, -10.0, -3.8, -3.7, -3.6
+    ];
+
+    // Genre bar chart
+    const genreCounts = genreOrder.map(genre => genreSongs[genre] ? genreSongs[genre].length : 0);
+    const genreHoverTexts = genreOrder.map(genre => {
+      const songList = genreSongs[genre] || [];
+      const preview = songList.slice(0, 4).map(item => `${item.song} — ${item.artist}`).join("<br>");
+      return `<b>${genre}</b><br>Count: ${songList.length}<br><br>${preview}<br><br>Click to expand full list`;
+    });
+
+    Plotly.newPlot("genre-bar-chart", [{
+      type: "bar",
+      x: genreOrder,
+      y: genreCounts,
+      marker: { color: genreOrder.map(g => genreColors[g] || "#666") },
+      text: genreHoverTexts,
+      hoverinfo: "text"
+    }], {
+      ...darkLayout,
+      xaxis: { ...darkLayout.xaxis, title: "Genre", tickangle: -35 },
+      yaxis: { ...darkLayout.yaxis, title: "Count" },
+      margin: { t: 10, r: 20, l: 50, b: 120 },
+      height: 360
+    }, {
+      responsive: true,
+      displayModeBar: false
+    });
+
+    function showSongsForGenre(genre) {
+      const title = document.getElementById("genre-title");
+      const container = document.getElementById("song-list-container");
+      const songsForGenre = genreSongs[genre] || [];
+
+      title.textContent = `${genre} (${songsForGenre.length} song${songsForGenre.length !== 1 ? "s" : ""})`;
+
+      let html = "<ol id='song-list'>";
+      songsForGenre.forEach(item => {
+        html += `<li><strong>${item.song}</strong> — ${item.artist}</li>`;
+      });
+      html += "</ol>";
+      container.innerHTML = html;
+    }
+
+    document.getElementById("genre-bar-chart").on("plotly_click", function(eventData) {
+      showSongsForGenre(eventData.points[0].x);
+    });
+
+    // Loudness chart
+    const trackNumbers = Array.from({ length: 50 }, (_, i) => i + 1);
+    const markerColors = normalizedGenres.map(g => genreColors[g] || "#333");
+
+    const stemLines = trackNumbers.map((x, i) => ({
+      type: "scatter",
+      x: [x, x],
+      y: [0, loudness[i]],
+      mode: "lines",
+      line: { width: 2, color: markerColors[i] },
+      hoverinfo: "skip",
+      showlegend: false
+    }));
+
+    const loudnessPoints = {
+      type: "scatter",
+      x: trackNumbers,
+      y: loudness,
+      mode: "markers",
+      marker: { size: 7, color: markerColors },
+      customdata: songs.map((s, i) => [songs[i], artists[i], normalizedGenres[i]]),
+      hovertemplate:
+        "<b>%{customdata[0]}</b><br>" +
+        "Artist: %{customdata[1]}<br>" +
+        "Genre: %{customdata[2]}<br>" +
+        "Loudness: %{y} dB<br>" +
+        "<extra></extra>"
+    };
+
+    Plotly.newPlot("loudness-chart", [...stemLines, loudnessPoints], {
+      ...darkLayout,
+      xaxis: { ...darkLayout.xaxis, title: "Track Number" },
+      yaxis: { ...darkLayout.yaxis, title: "Loudness (dB)", range: [-15, 1] },
+      margin: { t: 10, r: 20, l: 50, b: 55 },
+      height: 360
+    }, {
+      responsive: true,
+      displayModeBar: false
+    });
+
+    // Average loudness table using dashboard genre classification
+    const loudnessByGenre = {};
+    genreOrder.forEach(genre => {
+      loudnessByGenre[genre] = [];
+    });
+
+    const loudnessBySong = {};
+    songs.forEach((song, i) => {
+      const key = normalizeSongTitle(song);
+      if (loudnessBySong[key] === undefined) {
+        loudnessBySong[key] = loudness[i];
+      }
+    });
+
+    genreOrder.forEach(genre => {
+      const songList = genreSongs[genre] || [];
+      songList.forEach(item => {
+        const key = normalizeSongTitle(item.song);
+        if (loudnessBySong[key] !== undefined) {
+          loudnessByGenre[genre].push(loudnessBySong[key]);
+        }
+      });
+    });
+
+    const tableBody = document.getElementById("avg-loudness-table-body");
+    tableBody.innerHTML = genreOrder.map(genre => {
+      const values = loudnessByGenre[genre] || [];
+      const avgText = values.length
+        ? `${(values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)} dB`
+        : "N/A";
+
+      return `
+        <tr>
+          <td>
+            <span class="genre-color-dot" style="background:${genreColors[genre] || "#666"};"></span>
+            ${genre}
+          </td>
+          <td>${avgText}</td>
+        </tr>
+      `;
+    }).join("");
+
+    // Scatterplot
+    const tempos = [
+      171.005, 98.078, 116.971, 121.962, 123.95, 89.977, 95.39, 144.026, 127.087, 109.891,
+      116.735, 120.042, 99.034, 147.986, 81.604, 111.881, 110.962, 91.019, 142.053, 150.076,
+      99.048, 107.948, 90.989, 135.128, 83.903, 75.801, 146.967, 114.044, 128.978, 112.05,
+      123.056, 76.469, 89.96, 180.067, 117.948, 130.049, 105.095, 96.172, 180.067, 117.948,
+      112.022, 165.995, 145.842, 113.013, 114.044, 128.978, 112.05, 123.056, 76.469
+    ];
+
+    const durations_ms = [
+      200040, 209755, 196653, 176219, 183290, 181733, 174000, 173333, 159382, 182161,
+      163636, 215280, 162547, 212867, 207133, 215107, 237918, 189486, 245426, 237918,
+      171375, 207133, 194088, 239836, 245426, 190800, 194088, 200186, 239836, 228482,
+      208687, 210800, 295177, 199112, 295177, 180067, 157560, 214935, 182200, 165978,
+      295177, 194088, 200186, 239836, 228482, 208687, 210800
+    ];
+
+    const scatterLength = Math.min(songs.length, artists.length, normalizedGenres.length, tempos.length, durations_ms.length);
+    const durationsMinutes = durations_ms.slice(0, scatterLength).map(ms => (ms / 60000).toFixed(2));
+    const scatterGenres = normalizedGenres.slice(0, scatterLength);
+    const uniqueGenres = [...new Set(scatterGenres)];
+
+    const scatterTraces = uniqueGenres.map(genre => {
+      const indices = scatterGenres.map((g, i) => g === genre ? i : -1).filter(i => i !== -1);
+      return {
+        x: indices.map(i => tempos[i]),
+        y: indices.map(i => durationsMinutes[i]),
+        type: "scatter",
+        mode: "markers",
+        marker: {
+          size: 10,
+          color: genreColors[genre] || "#333",
+          line: { color: "black", width: 0.5 }
+        },
+        text: indices.map(i =>
+          `<b>${songs[i]}</b><br>` +
+          `Artist: ${artists[i]}<br>` +
+          `Genre: ${scatterGenres[i]}<br>` +
+          `Tempo: ${tempos[i]} BPM<br>` +
+          `Duration: ${durationsMinutes[i]} min`
+        ),
+        hoverinfo: "text",
+        name: genre,
+        legendgroup: genre,
+        showlegend: true
+      };
+    });
+
+    Plotly.newPlot("tempo-duration", scatterTraces, {
+      ...darkLayout,
+      xaxis: { ...darkLayout.xaxis, title: "Tempo (BPM)" },
+      yaxis: { ...darkLayout.yaxis, title: "Duration (minutes)" },
+      height: 430,
+      margin: { t: 10, r: 20, l: 60, b: 60 },
+      legend: {
+        ...darkLayout.legend,
+        orientation: "h",
+        y: 1.12,
+        x: 0
+      }
+    }, {
+      responsive: true,
+      displayModeBar: false
+    });
+  </script>
+</body>
+</html>
